@@ -1,0 +1,7 @@
+flask>=3.0
+numpy>=1.26
+pillow>=10.0
+# dlib-bin = dlib with pre-built wheels (no C++ compiler needed on Windows/Mac/Linux)
+dlib-bin>=19.24
+# the pre-trained dlib models are INSIDE this package, so nothing is downloaded at runtime
+face_recognition_models>=0.3.0

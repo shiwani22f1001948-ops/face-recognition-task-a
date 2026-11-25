@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Who's in the photo?</title>
+<style>
+  :root{
+    --paper:#f5f1e8; --card:#fffdf8; --ink:#1f1c18; --muted:#6f685d; --line:#ded6c6;
+    --known:#0f6b5c; --known-bg:#dff1ec; --unknown:#b4440f; --unknown-bg:#fbe6d9; --accent:#1f1c18;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{--paper:#171512;--card:#211e1a;--ink:#f1ece2;--muted:#a39b8c;--line:#38332b;
+      --known:#5fd1bb;--known-bg:#17352f;--unknown:#ff9a62;--unknown-bg:#40240f;--accent:#f1ece2}
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.5 var(--sans)}
+  header{max-width:1280px;margin:0 auto;padding:28px 24px 8px;display:flex;align-items:baseline;gap:16px;flex-wrap:wrap}
+  h1{font:600 34px/1.1 var(--serif);margin:0;letter-spacing:-.01em}
+  header p{margin:0;color:var(--muted)}
+  main{max-width:1280px;margin:0 auto;padding:16px 24px 48px;display:grid;gap:20px}
+  .setup{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  @media(max-width:820px){.setup{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px}
+  .card h2{font:600 20px/1.2 var(--serif);margin:0 0 4px}
+  .hint{color:var(--muted);font-size:14px;margin:0 0 14px}
+  .done h2::after{content:"  ✓";color:var(--known)}
+  button{font:600 15px var(--sans);background:var(--accent);color:var(--paper);border:0;border-radius:10px;
+    padding:12px 18px;cursor:pointer;display:inline-flex;align-items:center;gap:8px}
+  button.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  button:focus-visible,.drop:focus-visible{outline:3px solid var(--known);outline-offset:2px}
+  .bar{height:8px;background:var(--line);border-radius:8px;overflow:hidden;margin-top:14px;display:none}
+  .bar i{display:block;height:100%;width:0;background:var(--known);transition:width .2s}
+  .faces{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px;max-height:132px;overflow:auto}
+  .faces figure{margin:0;width:48px;text-align:center}
+  .faces img{width:48px;height:48px;object-fit:cover;border-radius:8px;display:block;border:1px solid var(--line)}
+  .faces figcaption{font-size:10px;line-height:1.1;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .warn{margin-top:12px;font-size:13px;color:var(--unknown);background:var(--unknown-bg);padding:8px 12px;border-radius:8px}
+  .warn ul{margin:4px 0 0;padding-left:18px}
+  .drop{border:2px dashed var(--line);border-radius:12px;padding:26px 16px;text-align:center;cursor:pointer;transition:.15s}
+  .drop.over,.drop:hover{border-color:var(--known);background:var(--known-bg)}
+  .drop[aria-disabled=true]{opacity:.5;pointer-events:none}
+  .drop b{display:block;font-size:17px}
+  .drop span{color:var(--muted);font-size:14px}
+  .strict{display:flex;align-items:center;gap:12px;margin-top:14px;font-size:14px;color:var(--muted)}
+  .strict input{flex:1;accent-color:var(--known)}
+  .result{display:none;grid-template-columns:minmax(0,1fr) 360px;gap:20px;align-items:start}
+  @media(max-width:980px){.result{grid-template-columns:1fr}}
+  .stage{position:relative;display:inline-block;max-width:100%;line-height:0;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:#000}
+  .stage img{max-width:100%;max-height:78vh;display:block}
+  .box{position:absolute;border:3px solid var(--known);border-radius:6px;box-shadow:0 0 0 1px rgba(0,0,0,.35);transition:.12s}
+  .box.unk{border:3px dashed var(--unknown)}
+  .box.hl{box-shadow:0 0 0 4px rgba(255,255,255,.9),0 0 0 6px var(--known)}
+  .box.unk.hl{box-shadow:0 0 0 4px rgba(255,255,255,.9),0 0 0 6px var(--unknown)}
+  .tag{position:absolute;left:-3px;top:100%;margin-top:4px;white-space:nowrap;font:600 13px/1 var(--sans);
+    padding:6px 8px;border-radius:6px;background:var(--known);color:#fff}
+  .box.unk .tag{background:var(--unknown)}
+  .summary{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+  .pill{font-weight:600;font-size:14px;padding:6px 12px;border-radius:99px;background:var(--line)}
+  .pill.k{background:var(--known-bg);color:var(--known)} .pill.u{background:var(--unknown-bg);color:var(--unknown)}
+  .list{display:grid;gap:8px;max-height:74vh;overflow:auto;padding:2px}
+  .row{display:grid;grid-template-columns:56px 20px 56px 1fr;align-items:center;gap:8px;padding:8px;border:1px solid var(--line);
+    border-radius:12px;background:var(--card);cursor:pointer}
+  .row.hl{border-color:var(--ink)}
+  .row img,.row .blank{width:56px;height:56px;border-radius:8px;object-fit:cover}
+  .row .blank{display:grid;place-items:center;background:var(--unknown-bg);color:var(--unknown);font:600 22px var(--serif)}
+  .row .arrow{color:var(--muted);text-align:center}
+  .name{font-weight:600}
+  .sub{font-size:12.5px;color:var(--muted)}
+  .row.unk .name{color:var(--unknown)}
+  .spinner{display:none;align-items:center;gap:10px;color:var(--muted);margin-top:14px}
+  .spinner::before{content:"";width:18px;height:18px;border:3px solid var(--line);border-top-color:var(--known);border-radius:50%;animation:s 1s linear infinite}
+  @keyframes s{to{transform:rotate(360deg)}}
+  @media(prefers-reduced-motion:reduce){.spinner::before{animation:none}}
+  .err{display:none;color:var(--unknown);background:var(--unknown-bg);padding:10px 14px;border-radius:10px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Who’s in the photo?</h1>
+  <p>Runs entirely on this computer. No internet, no uploads anywhere.</p>
+</header>
+
+<main>
+  <div class="setup">
+    <section class="card" id="c1">
+      <h2>1. Open the folder of people</h2>
+      <p class="hint">One photo per person, named like <i>Priya Sharma.jpg</i>.</p>
+      <input type="file" id="folder" webkitdirectory directory multiple hidden>
+      <button id="pick">📁 Choose folder…</button>
+      <div class="bar" id="bar"><i></i></div>
+      <div id="status" class="hint" style="margin:10px 0 0"></div>
+      <div class="faces" id="faces"></div>
+      <div id="problems"></div>
+    </section>
+
+    <section class="card" id="c2">
+      <h2>2. Add the group photo</h2>
+      <p class="hint">Drop a photo here or click to choose one.</p>
+      <input type="file" id="photo" accept="image/*" hidden>
+      <div class="drop" id="drop" tabindex="0" role="button" aria-disabled="true">
+        <b>Drop group photo</b><span>JPG, PNG, WebP</span>
+      </div>
+      <div class="strict">
+        <label for="thr">Strictness</label>
+        <span>looser</span><input type="range" id="thr" min="0.35" max="0.65" step="0.01" value="0.50"><span>stricter</span>
+      </div>
+      <div class="spinner" id="spin">Finding faces…</div>
+    </section>
+  </div>
+
+  <div class="err" id="err"></div>
+
+  <section class="result" id="result">
+    <div>
+      <div class="summary" id="summary"></div>
+      <div class="stage" id="stage"><img id="shot" alt="Group photo with names"></div>
+      <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
+        <button class="ghost" id="dl">⬇ Save photo with names</button>
+        <button class="ghost" id="csv">⬇ Save list (CSV)</button>
+      </div>
+    </div>
+    <div class="list" id="list" aria-label="Results"></div>
+  </section>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const IMG = /\.(jpe?g|png|webp|bmp)$/i;
+let results = [], photoURL = null, ready = false;
+
+const showErr = m => { $('err').textContent = m; $('err').style.display = m ? 'block' : 'none'; };
+const post = async (url, body, json) => {
+  const r = await fetch(url, {method:'POST', body: json ? JSON.stringify(body) : body,
+                              headers: json ? {'Content-Type':'application/json'} : {}});
+  const d = await r.json(); if (!r.ok) throw new Error(d.error || 'Something went wrong'); return d;
+};
+
+/* ---------- Step 1: folder ---------- */
+$('pick').onclick = () => $('folder').click();
+$('folder').onchange = async e => {
+  const files = [...e.target.files].filter(f => IMG.test(f.name));
+  if (!files.length) { showErr('No photos found in that folder.'); return; }
+  showErr(''); $('pick').disabled = true; $('c1').classList.remove('done');
+  $('bar').style.display = 'block'; $('faces').innerHTML = ''; $('problems').innerHTML = '';
+  setReady(false);
+  try {
+    await post('/api/gallery/reset', {}, true);
+    let d, N = 4;
+    for (let i = 0; i < files.length; i += N) {
+      const fd = new FormData(); files.slice(i, i + N).forEach(f => fd.append('files', f, f.name));
+      d = await post('/api/gallery/add', fd);
+      $('bar').firstElementChild.style.width = Math.min(100, (i + N) / files.length * 100) + '%';
+      $('status').textContent = `Learning faces… ${Math.min(i + N, files.length)} of ${files.length}`;
+    }
+    $('status').textContent = `${d.count} people ready.`;
+    $('faces').innerHTML = d.people.map(p => `<figure title="${esc(p.name)}"><img src="${p.thumb}" alt=""><figcaption>${esc(p.name)}</figcaption></figure>`).join('');
+    if (d.problems.length) $('problems').innerHTML = `<div class="warn">Check these files:<ul>${
+        d.problems.map(p => `<li>${esc(p.file)} — ${esc(p.reason)}</li>`).join('')}</ul></div>`;
+    if (d.count) { $('c1').classList.add('done'); setReady(true); }
+  } catch (err) { showErr(err.message); }
+  $('bar').style.display = 'none'; $('pick').disabled = false; $('pick').textContent = '📁 Choose a different folder…';
+  e.target.value = '';
+};
+function setReady(v){ ready = v; $('drop').setAttribute('aria-disabled', !v); }
+
+/* ---------- Step 2: group photo ---------- */
+const drop = $('drop');
+drop.onclick = () => ready && $('photo').click();
+drop.onkeydown = e => (e.key === 'Enter' || e.key === ' ') && drop.click();
+['dragover','dragenter'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => ready && e.dataTransfer.files[0] && analyse(e.dataTransfer.files[0]));
+$('photo').onchange = e => e.target.files[0] && analyse(e.target.files[0]);
+
+async function analyse(file) {
+  showErr(''); $('spin').style.display = 'flex'; $('result').style.display = 'none';
+  const fd = new FormData(); fd.append('photo', file); fd.append('threshold', $('thr').value);
+  try {
+    const d = await post('/api/identify', fd);
+    if (photoURL) URL.revokeObjectURL(photoURL);
+    photoURL = URL.createObjectURL(file);
+    $('shot').src = photoURL; results = d.results; await $('shot').decode().catch(()=>{});
+    if (!results.length) showErr('No faces found in that photo. Try a clearer or larger photo.');
+    else { render(); $('result').style.display = 'grid'; $('result').scrollIntoView({behavior:'smooth', block:'start'}); }
+  } catch (err) { showErr(err.message); }
+  $('spin').style.display = 'none'; $('photo').value = '';
+}
+
+let t;
+$('thr').oninput = () => { clearTimeout(t); t = setTimeout(async () => {
+  if (!results.length) return;
+  results = (await post('/api/rematch', {threshold: +$('thr').value}, true)).results; render();
+}, 120); };
+
+/* ---------- drawing ---------- */
+function render() {
+  const known = results.filter(r => r.name).length;
+  $('summary').innerHTML = `<span class="pill">${results.length} faces</span>
+    <span class="pill k">${known} recognised</span><span class="pill u">${results.length - known} unknown</span>`;
+  $('stage').querySelectorAll('.box').forEach(b => b.remove());
+  results.forEach(r => {
+    const b = document.createElement('div'); b.className = 'box' + (r.name ? '' : ' unk'); b.id = 'b' + r.id;
+    Object.assign(b.style, {left: r.box.x*100+'%', top: r.box.y*100+'%', width: r.box.w*100+'%', height: r.box.h*100+'%'});
+    b.innerHTML = `<span class="tag">${esc(r.name || 'Unknown')}</span>`;
+    b.onmouseenter = () => hl(r.id, true); b.onmouseleave = () => hl(r.id, false);
+    $('stage').appendChild(b);
+  });
+  $('list').innerHTML = results.map(r => {
+    const strong = r.name && r.distance < 0.8 * (+$('thr').value);
+    const sub = r.name ? (strong ? 'Strong match' : 'Possible match – worth a look')
+                       : (r.best_guess ? `Not in folder (closest: ${esc(r.best_guess.name)}, too different)` : 'Not in folder');
+    return `<div class="row ${r.name ? '' : 'unk'}" id="r${r.id}" title="distance ${r.distance ?? r.best_guess?.distance ?? ''}">
+      <img src="${r.face_thumb}" alt="Face in photo"><span class="arrow">→</span>
+      ${r.name ? `<img src="${r.match_thumb}" alt="Folder photo of ${esc(r.name)}">` : `<div class="blank">?</div>`}
+      <div><div class="name">${esc(r.name || 'Unknown')}</div><div class="sub">${sub}</div></div></div>`;
+  }).join('');
+  results.forEach(r => { const row = $('r' + r.id);
+    row.onmouseenter = () => hl(r.id, true); row.onmouseleave = () => hl(r.id, false); });
+}
+function hl(id, on){ $('b'+id)?.classList.toggle('hl', on); $('r'+id)?.classList.toggle('hl', on); }
+
+/* ---------- exports ---------- */
+$('dl').onclick = () => {
+  const im = $('shot'), c = document.createElement('canvas');
+  c.width = im.naturalWidth; c.height = im.naturalHeight;
+  const g = c.getContext('2d'); g.drawImage(im, 0, 0);
+  const lw = Math.max(3, c.width / 400), fs = Math.max(14, c.width / 60);
+  g.font = `600 ${fs}px system-ui, sans-serif`; g.textBaseline = 'top';
+  results.forEach(r => {
+    const x = r.box.x*c.width, y = r.box.y*c.height, w = r.box.w*c.width, h = r.box.h*c.height;
+    const col = r.name ? '#0f6b5c' : '#b4440f', txt = r.name || 'Unknown';
+    g.strokeStyle = col; g.lineWidth = lw; g.setLineDash(r.name ? [] : [lw*3, lw*2]); g.strokeRect(x, y, w, h);
+    g.setLineDash([]); const tw = g.measureText(txt).width + fs*.8;
+    g.fillStyle = col; g.fillRect(x, y + h + 4, tw, fs*1.5); g.fillStyle = '#fff'; g.fillText(txt, x + fs*.4, y + h + 4 + fs*.25);
+  });
+  const a = document.createElement('a'); a.download = 'group-photo-named.jpg'; a.href = c.toDataURL('image/jpeg', .92); a.click();
+};
+$('csv').onclick = () => {
+  const rows = [['position','name','distance']].concat(results.map((r,i) => [i+1, '"' + (r.name || 'Unknown') + '"', r.distance ?? '']));
+  const a = document.createElement('a'); a.download = 'who-is-who.csv';
+  a.href = URL.createObjectURL(new Blob([rows.map(r => r.join(',')).join('\n')], {type:'text/csv'})); a.click();
+};
+</script>
+</body>
+</html>
